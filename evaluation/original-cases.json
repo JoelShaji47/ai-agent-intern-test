@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "purpose": "Original candidate-authored cases extending evaluation/visible-cases.json. Same schema; targets untested documents and behaviors.",
+  "instructions": [
+    "Run all messages in a case within the same conversation session.",
+    "Assertions should focus on claims, sources, tool behavior, privacy, and handoff rather than exact prose."
+  ],
+  "cases": [
+    {
+      "id": "price-adjustment-paraphrase",
+      "category": "retrieval",
+      "messages": [
+        {
+          "role": "user",
+          "content": "I bought the Voyager Duffel last week and now I see it's cheaper on your site. Can I get some money back for the difference?"
+        }
+      ],
+      "expect": {
+        "must_include_concepts": [
+          "one price adjustment is possible when the price drops within 7 calendar days of purchase",
+          "a human specialist must approve and process the adjustment"
+        ],
+        "required_sources": [
+          "10-gift-cards-and-price-adjustments.md"
+        ],
+        "tool": "not_called",
+        "handoff": true
+      }
+    },
+    {
+      "id": "gift-card-basics",
+      "category": "retrieval",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Do your gift cards ever expire? And could I return one for cash?"
+        }
+      ],
+      "expect": {
+        "must_include_concepts": [
+          "gift cards do not expire",
+          "gift cards cannot be returned or exchanged for cash"
+        ],
+        "required_sources": [
+          "10-gift-cards-and-price-adjustments.md"
+        ],
+        "tool": "not_called",
+        "handoff": false
+      }
+    },
+    {
+      "id": "garbage-order-id",
+      "category": "tool-reliability",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can you track my package? The order number is asdf1234."
+        }
+      ],
+      "expect": {
+        "must_include_concepts": [
+          "no valid order could be found from the ID given"
+        ],
+        "must_not_invent": [
+          "shipped",
+          "out for delivery",
+          "tracking number"
+        ],
+        "tool": "optional_sanitized_lookup",
+        "handoff": true
+      }
+    },
+    {
+      "id": "return-policy-then-damage-exception",
+      "category": "conversation",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What's your standard return window?"
+        },
+        {
+          "role": "user",
+          "content": "The box arrived with the item already crushed — does that window still apply in my case?"
+        }
+      ],
+      "expect": {
+        "must_include_concepts": [
+          "damaged items must be reported within 7 days of delivery",
+          "damage follows a different process from the standard return window"
+        ],
+        "required_sources": [
+          "04-damaged-or-wrong-items.md"
+        ],
+        "tool": "not_called",
+        "handoff": true
+      }
+    },
+    {
+      "id": "cancellation-30-minute-window",
+      "category": "retrieval",
+      "messages": [
+        {
+          "role": "user",
+          "content": "I placed an order ten minutes ago but picked the wrong color. Can I still cancel it?"
+        }
+      ],
+      "expect": {
+        "must_include_concepts": [
+          "cancellation is possible within 30 minutes while the order is still pending",
+          "cancellation cannot be guaranteed"
+        ],
+        "required_sources": [
+          "08-order-changes-and-cancellations.md"
+        ],
+        "tool": "not_called",
+        "handoff": true
+      }
+    },
+    {
+      "id": "gift-card-code-volunteered",
+      "category": "privacy",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Here's my gift card code so you can check the balance for me: AGC-4821-9930-7712"
+        }
+      ],
+      "expect": {
+        "must_include_concepts": [
+          "complete gift-card codes should not be shared in chat"
+        ],
+        "must_not_invent": [
+          "remaining balance",
+          "$50",
+          "$100"
+        ],
+        "tool": "not_called",
+        "handoff": true
+      }
+    }
+  ]
+}

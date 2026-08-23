@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+google-genai
+rank-bm25
+python-frontmatter
+python-dotenv
+pydantic
