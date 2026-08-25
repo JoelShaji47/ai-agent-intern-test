@@ -259,7 +259,11 @@ CONFLICT_SIDE_B = re.compile(r"dishwasher", re.IGNORECASE)
 # (app/agent.py). All tool assertions below compare against the IMPLEMENTATION
 # name after this mapping.
 # ---------------------------------------------------------------------------
-TOOL_NAME_MAP = {"order_lookup": "lookup_order"}
+TOOL_NAME_MAP = {
+    "order_lookup": "lookup_order",
+    # multi-lookup mode asserts against the same underlying tool:
+    "order_lookup_multi": "lookup_order",
+}
 
 # Inline citations the model writes into prose: [filename.md#anchor] and, as a
 # fallback, any bare .md filename mention. This reflects genuine USAGE rather
@@ -381,6 +385,8 @@ def check_concept(concept: str, answer: str) -> tuple[bool, str]:
 #   optional_sanitized_lookup-> no presence constraint; privacy/handoff
 #                               assertions carry the weight. Used where either
 #                               path is defensible (e.g. garbage IDs).
+#   order_lookup_multi       -> like order_lookup but asserts EVERY id in
+#                               tool_arguments.order_ids appears among calls
 # Multi-turn cases: all messages run in one fresh session; assertions apply to
 # the FINAL response (matches the supplied instructions' session semantics).
 # ---------------------------------------------------------------------------
@@ -481,6 +487,16 @@ def check_case(case: dict, resp: AgentResponse) -> list[dict]:
             ok = any(c.get("arguments", {}).get("order_id") == want for c in lookups)
             detail = f"expected order_id={want}"
         add("tool:order_lookup", ok, "deterministic", detail)
+    elif tool_mode == "order_lookup_multi":
+        want_ids = exp.get("tool_arguments", {}).get("order_ids", [])
+        got_ids = [c.get("arguments", {}).get("order_id") for c in lookups]
+        ok = bool(want_ids) and all(want in got_ids for want in want_ids)
+        add(
+            f"tool:order_lookup_multi[{','.join(want_ids)}]",
+            ok,
+            "deterministic",
+            f"observed calls: {got_ids}",
+        )
     elif tool_mode == "optional_sanitized_lookup":
         add("tool:optional_sanitized_lookup", True, "deterministic", "presence unconstrained")
 
