@@ -94,7 +94,7 @@ retrieved passages ground the LLM's answer.
                                 │ Retrieved passages (untrusted)
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  LLM (Gemini 3.5 Flash Lite, temp 0.2)                          │
+│  LLM (Gemini 3.5 Flash Lite, temp 0.2)                           │
 │  Prompt enforces: injection resistance, citation accuracy,       │
 │  handoff-marker instruction. Reasons over tool results.          │
 └────────────┬─────────────────────────────────────┬───────────────┘
@@ -171,7 +171,7 @@ In addition to the formal evaluation suite, 15 manual stress-test probes were ex
 
 ## Bug Diary
 
-Five reproduced failures, in the order they were found. A recurring theme: the underlying agent behavior was often closer to correct than the *mechanism checking it*, which needed to become more deterministic over time.
+Four reproduced failures, in the order they were found. A recurring theme: the underlying agent behavior was often closer to correct than the *mechanism checking it*, which needed to become more deterministic over time.
 
 ### 1. Retrieval missed the right document on paraphrased queries
 
@@ -207,10 +207,10 @@ Five reproduced failures, in the order they were found. A recurring theme: the u
 
 ## Known Limitations
 
-- **Retrieval and citation aren't bulletproof.** BM25 misses queries with low vocabulary overlap, and the model has occasionally cited nonexistent or transposed filenames despite explicit character-for-character instructions — mitigated by a frontend guard, but not eliminated at the source.
-- **In-memory session state only.** Conversation history does not persist across a server restart, per the assignment's explicit scope.
-- **Authentication.** The demo assumes possession of an order ID is sufficient. Production would require OAuth/SSO or email verification.
-- **Gemini Flash Lite's free-tier quota (500 requests/day) constrains scale testing.** Development and evaluation runs were sometimes throttled mid-run, requiring retry and backoff handling. A production deployment would need a paid tier or a different rate-limiting strategy.
+- **Retrieval and citation aren't bulletproof :** BM25 misses queries with low vocabulary overlap, and the model has occasionally cited nonexistent or transposed filenames despite explicit character-for-character instructions — mitigated by a frontend guard, but not eliminated at the source.
+- **In-memory session state only :** Conversation history does not persist across a server restart, per the assignment's explicit scope.
+- **Authentication :** The demo assumes possession of an order ID is sufficient. Production would require OAuth/SSO or email verification.
+- **Gemini Flash Lite's free-tier quota (500 requests/day) constrains scale testing :** Development and evaluation runs were sometimes throttled mid-run, requiring retry and backoff handling. A production deployment would need a paid tier or a different rate-limiting strategy.
 
 ---
 
@@ -227,3 +227,34 @@ Five reproduced failures, in the order they were found. A recurring theme: the u
 - **Suggestion:** Filter retrieved chunks by authority tier before passing to the model — drop superseded and non-authoritative content to prevent the agent from citing outdated policy.
 - **Problem:** Also silently removed superseded documents that were the only source discussing a specific detail, leaving the agent unable to acknowledge or explicitly dismiss outdated content.
 - **Fix:** Two-stage ranking instead — rank by relevance first, then resurface authoritative content preferentially, so the model retains visibility into all content and can reason about it explicitly.
+
+---
+
+## Project Structure
+
+```
+ai-agent-intern-test/
+├─ backend/
+│  ├─ app/
+│  │  ├─ __init__.py
+│  │  ├─ main.py                  # FastAPI entry point, /chat endpoint, CORS
+│  │  ├─ agent.py                 # Gemini tool-calling loop, system prompt, handoff logic
+│  │  ├─ ingest.py                # KB ingestion: markdown parsing, heading-level chunking
+│  │  ├─ retrieval.py             # BM25 search, two-stage ranking, conflict detection
+│  │  ├─ orders.py                # Order lookup tool, PII-safe Pydantic model
+│  │  ├─ session.py               # In-memory conversation store for multi-turn
+│  │  └─ multiturn_cli.py         # Verification CLI for multi-turn scenarios
+│  └─ evaluation/
+│     └─ run_eval.py              # 25-case eval suite with deterministic + LLM assertions
+├─ frontend/
+│  ├─ public/
+│  └─ src/
+├─ data/
+├─ knowledge-base/
+├─ evaluation/
+│  ├─ visible-cases.json
+│  └─ results/
+└─ README.md
+```
+
+*Dependencies, caches, and generated files (`venv`, `node_modules`, `__pycache__`, `dist`) excluded for clarity.*
