@@ -5,7 +5,7 @@ import type { ChatMessage as ChatMessageType } from "@/types";
 /** Matches a knowledge-base citation token wherever it appears, consuming any
  * surrounding wrapper (square brackets or backticks) so bracketed,
  * backtick-wrapped, bare, and comma-combined forms all normalize the same. */
-const CITE_RE = /(?:\[\s*|`)?([a-z0-9][a-z0-9.-]*\.md#[a-z0-9-]+)(?:\s*\]|`)?/g;
+const CITE_RE = /(?:\[\s*|`)?([a-z0-9][a-z0-9.-]*\.md(?:#[a-z0-9-]+)?)(?:\s*\]|`)?/g;
 
 /** The 14 real knowledge-base documents. Citations naming anything else are
  * hallucinated/malformed (e.g. a transposed prefix like 05-final-sale...) and
@@ -49,9 +49,23 @@ function citedSources(text: string): string[] {
     const cite = match[1];
     if (!isKnownCitation(cite) || seen.has(cite)) continue;
     seen.add(cite);
-    sources.push(cite);
+    sources.push(cite.split("#")[0]);
   }
   return sources;
+}
+
+/** Strip the "Sources" block the model sometimes appends to its answer.
+ *  SourcePills renders them separately, so keeping them in the prose
+ *  would cause a duplicate. Returns [cleaned text, extracted source filenames]. */
+function stripSourcesBlock(text: string): [string, string[]] {
+  const m = text.match(/\n*\n*Sources\s*:?\s*\n([\s\S]*$)|\n*\n*Sources\s*:\s*([^\n]*)$/i);
+  if (!m) return [text, []];
+  const cleaned = text.slice(0, m.index);
+  const raw = (m[1] ?? m[2] ?? "");
+  const files = [...new Set(
+    [...raw.matchAll(/([a-z0-9][a-z0-9.-]*\.md)/gi)].map(x => x[1].toLowerCase())
+  )];
+  return [cleaned, files];
 }
 
 function SourcePills({ sources }: { sources: string[] }) {
@@ -65,7 +79,7 @@ function SourcePills({ sources }: { sources: string[] }) {
         {sources.map((source) => (
           <span
             key={source}
-            className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 font-mono text-[0.66rem] text-secondary-foreground"
+            className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 font-mono text-[0.75rem] text-secondary-foreground"
             title={source}
           >
             <span className="size-1 rounded-full bg-primary/60" aria-hidden />
@@ -145,15 +159,19 @@ export function ChatMessage({ message }: { message: ChatMessageType }) {
     );
   }
 
+  const [displayText, blockSources] = stripSourcesBlock(message.content);
+  const inlineSources = citedSources(displayText);
+  const allSources = [...new Set([...inlineSources, ...blockSources])];
+
   return (
     <div className="msg-in flex flex-col items-start">
       <div className="max-w-[92%] rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-3 shadow-sm">
         <div className="chat-body text-[0.92rem] leading-relaxed [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_strong]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {withCiteChips(message.content)}
+            {withCiteChips(displayText)}
           </ReactMarkdown>
         </div>
-        <SourcePills sources={citedSources(message.content)} />
+        <SourcePills sources={allSources} />
         {message.handoff && <HandoffTicket />}
       </div>
     </div>

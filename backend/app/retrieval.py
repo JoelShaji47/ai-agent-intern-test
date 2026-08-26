@@ -168,6 +168,36 @@ def retrieve(index: BM25Index, query: str, top_k: int = 12) -> list[RetrievedChu
                 selected.sort(key=rank)
                 break
 
+    # Sibling expansion: when a document already has a selected chunk, also
+    # include its top 1-2 other chunks from the pool even if they individually
+    # scored below the normal cutoff -- as long as they clear a much lower
+    # floor. This improves recall for multi-section documents where a query
+    # matches one section strongly but a closely related section scored just
+    # below the line.
+    _MAX_SIBLINGS_PER_DOC = 2
+    _SIBLING_FLOOR = 1.0
+    selected_indices = {idx for _, idx in selected}
+    selected_files = {index.chunks[idx].filename for _, idx in selected}
+    sibling_counts: dict[str, int] = {}
+    for score, idx in pool[top_k:]:
+        if selected_files and all(
+            sibling_counts.get(f, 0) >= _MAX_SIBLINGS_PER_DOC for f in selected_files
+        ):
+            break
+        chunk = index.chunks[idx]
+        if idx in selected_indices:
+            continue
+        if chunk.filename not in selected_files:
+            continue
+        if score < _SIBLING_FLOOR:
+            continue
+        count = sibling_counts.get(chunk.filename, 0)
+        if count >= _MAX_SIBLINGS_PER_DOC:
+            continue
+        selected.append((score, idx))
+        selected_indices.add(idx)
+        sibling_counts[chunk.filename] = count + 1
+
     return [
         RetrievedChunk(
             chunk=index.chunks[idx],
